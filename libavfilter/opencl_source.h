@@ -19,6 +19,7 @@
 #ifndef AVFILTER_OPENCL_SOURCE_H
 #define AVFILTER_OPENCL_SOURCE_H
 
+extern const char *ff_opencl_source_overlay;
 extern const char *ff_opencl_source_rgbyuv;
 
 #endif /* AVFILTER_OPENCL_SOURCE_H */
