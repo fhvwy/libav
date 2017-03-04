@@ -246,6 +246,7 @@ External library support:
   --enable-nvenc   Nvidia video encoding
   --enable-omx     OpenMAX IL
   --enable-omx-rpi OpenMAX IL for Raspberry Pi
+  --enable-opencl  OpenCL processing
   --enable-vaapi   Video Acceleration API (mainly Unix/Intel)
   --enable-vda     Apple Video Decode Acceleration [auto]
   --enable-vdpau   Nvidia Video Decode and Presentation API for Unix [auto]
@@ -1278,6 +1279,7 @@ HWACCEL_LIBRARY_LIST="
     mmal
     nvenc
     omx
+    opencl
     vaapi
     vda
     vdpau
@@ -2563,7 +2565,7 @@ avdevice_extralibs="libm_extralibs"
 avformat_extralibs="libm_extralibs"
 avfilter_extralibs="pthreads_extralibs libm_extralibs"
 avresample_extralibs="libm_extralibs"
-avutil_extralibs="clock_gettime_extralibs cuda_extralibs cuvid_extralibs libm_extralibs libmfx_extralibs nanosleep_extralibs pthreads_extralibs user32_extralibs vaapi_extralibs vaapi_drm_extralibs vaapi_x11_extralibs vdpau_x11_extralibs wincrypt_extralibs"
+avutil_extralibs="clock_gettime_extralibs cuda_extralibs cuvid_extralibs libm_extralibs libmfx_extralibs nanosleep_extralibs opencl_extralibs pthreads_extralibs user32_extralibs vaapi_extralibs vaapi_drm_extralibs vaapi_x11_extralibs vdpau_x11_extralibs wincrypt_extralibs"
 swscale_extralibs="libm_extralibs"
 
 # programs
@@ -4833,6 +4835,7 @@ enabled omx               && require_header OMX_Core.h
 enabled omx_rpi           && { check_header OMX_Core.h ||
                                { ! enabled cross_compile && add_cflags -isystem/opt/vc/include/IL && check_header OMX_Core.h ; } ||
                                die "ERROR: OpenMAX IL headers not found"; } && enable omx
+enabled opencl            && require opencl CL/cl.h clGetPlatformIDs -lOpenCL
 enabled openssl           && { { check_pkg_config openssl openssl openssl/ssl.h OPENSSL_init_ssl ||
                                  check_pkg_config openssl openssl openssl/ssl.h SSL_library_init; } ||
                                check_lib openssl openssl/ssl.h SSL_library_init -lssl -lcrypto ||
