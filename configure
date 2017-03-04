@@ -1723,6 +1723,7 @@ HAVE_LIST="
     libc_msvcrt
     MMAL_PARAMETER_VIDEO_MAX_NUM_CALLBACKS
     opencl_beignet_vaapi
+    opencl_intel_media_vaapi
     sdl
     section_data_rel_ro
     threads
@@ -4941,6 +4942,10 @@ enabled vaapi &&
 if enabled opencl && enabled vaapi ; then
     check_type "CL/cl_intel.h" "clCreateImageFromFdINTEL_fn" &&
         enable opencl_beignet_vaapi
+    if enabled libmfx ; then
+        check_type "CL/cl.h CL/va_ext.h" "clCreateFromVA_APIMediaSurfaceINTEL_fn" &&
+            enable opencl_intel_media_vaapi
+    fi
 fi
 
 enabled vdpau &&
