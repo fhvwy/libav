@@ -100,6 +100,7 @@ void avfilter_register_all(void)
     REGISTER_FILTER(OVERLAY,        overlay,        vf);
     REGISTER_FILTER(PAD,            pad,            vf);
     REGISTER_FILTER(PIXDESCTEST,    pixdesctest,    vf);
+    REGISTER_FILTER(PROGRAM_OPENCL, program_opencl, vf);
     REGISTER_FILTER(SCALE,          scale,          vf);
     REGISTER_FILTER(SCALE_NPP,      scale_npp,      vf);
     REGISTER_FILTER(SCALE_QSV,      scale_qsv,      vf);
