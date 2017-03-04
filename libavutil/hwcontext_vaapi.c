@@ -125,6 +125,15 @@ static enum AVPixelFormat vaapi_pix_fmt_from_fourcc(unsigned int fourcc)
     return AV_PIX_FMT_NONE;
 }
 
+unsigned int ff_vaapi_fourcc_from_pix_fmt(enum AVPixelFormat pix_fmt)
+{
+    int i;
+    for (i = 0; i < FF_ARRAY_ELEMS(vaapi_format_map); i++)
+        if (vaapi_format_map[i].pix_fmt == pix_fmt)
+            return vaapi_format_map[i].fourcc;
+    return 0;
+}
+
 static int vaapi_get_image_format(AVHWDeviceContext *hwdev,
                                   enum AVPixelFormat pix_fmt,
                                   VAImageFormat **image_format)

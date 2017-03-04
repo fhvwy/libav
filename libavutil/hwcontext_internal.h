@@ -165,4 +165,7 @@ extern const HWContextType ff_hwcontext_type_qsv;
 extern const HWContextType ff_hwcontext_type_vaapi;
 extern const HWContextType ff_hwcontext_type_vdpau;
 
+
+unsigned int ff_vaapi_fourcc_from_pix_fmt(enum AVPixelFormat pix_fmt);
+
 #endif /* AVUTIL_HWCONTEXT_INTERNAL_H */
