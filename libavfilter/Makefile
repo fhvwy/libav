@@ -106,3 +106,9 @@ OBJS-$(CONFIG_TESTSRC_FILTER)                += vsrc_testsrc.o
 
 TOOLS     = graph2dot
 TESTPROGS = filtfmts
+
+OPENCL = $(subst $(SRC_PATH)/,,$(wildcard $(SRC_PATH)/libavfilter/opencl/*.cl))
+.SECONDARY: $(OPENCL:.cl=.c)
+libavfilter/opencl/%.c: TAG = OPENCL
+libavfilter/opencl/%.c: $(SRC_PATH)/libavfilter/opencl/%.cl
+	$(M)$(SRC_PATH)/tools/cl2c $< $@
