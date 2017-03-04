@@ -13,6 +13,9 @@ libavutil:     2017-03-23
 
 API changes, most recent first:
 
+2017-xx-xx - xxxxxxx - lavu 56.n+1.0 - pixfmt.h
+  Add AV_PIX_FMT_OPENCL.
+
 2017-xx-xx - xxxxxxx - lavu 56.4.0 - imgutils.h
   Add av_image_fill_black().
 

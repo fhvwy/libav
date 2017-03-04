@@ -249,6 +249,13 @@ enum AVPixelFormat {
      */
     AV_PIX_FMT_D3D11,
 
+    /*
+     * Hardware surfaces used in OpenCL.
+     * data[i] contain 2D image objects (typed in C as cl_mem, used
+     * in OpenCL as image2d_t) for each plane of the surface.
+     */
+    AV_PIX_FMT_OPENCL,
+
     AV_PIX_FMT_NB,        ///< number of pixel formats, DO NOT USE THIS if you want to link with shared libav* because the number of formats might differ between versions
 };
 
