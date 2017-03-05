@@ -1723,6 +1723,7 @@ HAVE_LIST="
     libc_msvcrt
     MMAL_PARAMETER_VIDEO_MAX_NUM_CALLBACKS
     opencl_beignet_vaapi
+    opencl_dxva2
     opencl_intel_media_vaapi
     sdl
     section_data_rel_ro
@@ -4946,6 +4947,11 @@ if enabled opencl && enabled vaapi ; then
         check_type "CL/cl.h CL/va_ext.h" "clCreateFromVA_APIMediaSurfaceINTEL_fn" &&
             enable opencl_intel_media_vaapi
     fi
+fi
+
+if enabled opencl && enabled dxva2 ; then
+    check_type "CL/cl_dx9_media_sharing.h" cl_dx9_surface_info_khr &&
+        enable opencl_dxva2
 fi
 
 enabled vdpau &&
