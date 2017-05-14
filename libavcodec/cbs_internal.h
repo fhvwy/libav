@@ -97,6 +97,7 @@ int ff_cbs_write_se_golomb(CodedBitstreamContext *ctx, PutBitContext *pbc,
 
 
 extern const CodedBitstreamType ff_cbs_type_h264;
+extern const CodedBitstreamType ff_cbs_type_h265;
 
 
 #endif /* AVCODEC_CBS_INTERNAL_H */
