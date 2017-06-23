@@ -51,8 +51,6 @@
 
 #define H264_MAX_PICTURE_COUNT 32
 
-#define MAX_MMCO_COUNT         66
-
 #define MAX_DELAYED_PIC_COUNT  16
 
 /* Compiling in interlaced support reduces the speed
@@ -316,7 +314,7 @@ typedef struct H264SliceContext {
     uint8_t cabac_state[1024];
     int cabac_init_idc;
 
-    MMCO mmco[MAX_MMCO_COUNT];
+    MMCO mmco[H264_MAX_MMCO_COUNT];
     int  nb_mmco;
     int explicit_ref_marking;
 
@@ -461,7 +459,7 @@ typedef struct H264Context {
     /**
      * memory management control operations buffer.
      */
-    MMCO mmco[MAX_MMCO_COUNT];
+    MMCO mmco[H264_MAX_MMCO_COUNT];
     int  nb_mmco;
     int mmco_reset;
     int explicit_ref_marking;
