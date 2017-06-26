@@ -227,7 +227,7 @@ static int d3d11va_frames_init(AVHWFramesContext *ctx)
         .ArraySize  = ctx->initial_pool_size,
         .Usage      = D3D11_USAGE_DEFAULT,
         .BindFlags  = hwctx->BindFlags,
-        .MiscFlags  = hwctx->MiscFlags,
+        .MiscFlags  = hwctx->MiscFlags | D3D11_RESOURCE_MISC_SHARED,
     };
 
     if (hwctx->texture) {
