@@ -312,7 +312,4 @@ int ff_hevc_decode_nal_pps(GetBitContext *gb, AVCodecContext *avctx,
 int ff_hevc_decode_short_term_rps(GetBitContext *gb, AVCodecContext *avctx,
                                   ShortTermRPS *rps, const HEVCSPS *sps, int is_slice_header);
 
-int ff_hevc_encode_nal_vps(HEVCVPS *vps, unsigned int id,
-                           uint8_t *buf, int buf_size);
-
 #endif /* AVCODEC_HEVC_PS_H */
