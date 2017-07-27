@@ -28,11 +28,11 @@
 #include "libavutil/opt.h"
 
 #include "avcodec.h"
-#include "bytestream.h"
+#include "cbs.h"
+#include "cbs_h265.h"
 #include "get_bits.h"
 #include "hevc.h"
 #include "hevcdec.h"
-#include "h2645_parse.h"
 #include "internal.h"
 #include "qsv.h"
 #include "qsv_internal.h"
@@ -52,107 +52,135 @@ typedef struct QSVHEVCEncContext {
 
 static int generate_fake_vps(QSVEncContext *q, AVCodecContext *avctx)
 {
-    GetByteContext gbc;
-    PutByteContext pbc;
-
-    GetBitContext gb;
-    H2645NAL sps_nal = { NULL };
-    HEVCSPS sps = { 0 };
-    HEVCVPS vps = { 0 };
-    uint8_t vps_buf[128], vps_rbsp_buf[128];
-    uint8_t *new_extradata;
-    unsigned int sps_id;
-    int ret, i, type, vps_size;
+    CodedBitstreamContext cbc;
+    CodedBitstreamFragment ps;
+    const H265RawSPS *sps;
+    H265RawVPS vps;
+    uint8_t *data = NULL;
+    size_t data_size;
+    int err, sps_pos, i;
 
     if (!avctx->extradata_size) {
-        av_log(avctx, AV_LOG_ERROR, "No extradata returned from libmfx\n");
+        av_log(avctx, AV_LOG_ERROR,
+               "No parameter sets returned by libmfx.\n");
         return AVERROR_UNKNOWN;
     }
 
-    /* parse the SPS */
-    ret = ff_h2645_extract_rbsp(avctx->extradata + 4, avctx->extradata_size - 4, &sps_nal);
-    if (ret < 0) {
-        av_log(avctx, AV_LOG_ERROR, "Error unescaping the SPS buffer\n");
-        return ret;
+    err = ff_cbs_init(&cbc, AV_CODEC_ID_HEVC, avctx);
+    if (err < 0)
+        return err;
+
+    err = ff_cbs_read(&cbc, &ps, avctx->extradata, avctx->extradata_size);
+    if (err < 0) {
+        av_log(avctx, AV_LOG_ERROR,
+               "Error reading parameter sets returned by libmfx.\n");
+        ff_cbs_close(&cbc);
+        return err;
     }
 
-    ret = init_get_bits8(&gb, sps_nal.data, sps_nal.size);
-    if (ret < 0) {
-        av_freep(&sps_nal.rbsp_buffer);
-        return ret;
+    sps = NULL;
+    for (sps_pos = 0; sps_pos < ps.nb_units; sps_pos++) {
+        if (ps.units[sps_pos].type == HEVC_NAL_SPS) {
+            sps = ps.units[sps_pos].content;
+            break;
+        }
+    }
+    if (!sps) {
+        av_log(avctx, AV_LOG_ERROR, "No SPS returned by libmfx.\n");
+        goto fail;
     }
 
-    get_bits(&gb, 1);
-    type = get_bits(&gb, 6);
-    if (type != HEVC_NAL_SPS) {
-        av_log(avctx, AV_LOG_ERROR, "Unexpected NAL type in the extradata: %d\n",
-               type);
-        av_freep(&sps_nal.rbsp_buffer);
-        return AVERROR_INVALIDDATA;
-    }
-    get_bits(&gb, 9);
+    vps = (H265RawVPS) {
+        .nal_unit_header = {
+            .nal_unit_type         = HEVC_NAL_VPS,
+            .nuh_layer_id          = 0,
+            .nuh_temporal_id_plus1 = 1,
+        },
+        .vps_video_parameter_set_id    = sps->sps_video_parameter_set_id,
+        .vps_base_layer_internal_flag  = 1,
+        .vps_base_layer_available_flag = 1,
+        .vps_max_layers_minus1         = 0,
+        .vps_max_sub_layers_minus1     = sps->sps_max_sub_layers_minus1,
+        .vps_temporal_id_nesting_flag  =
+            sps->sps_max_sub_layers_minus1 == 0 ? 1 : 0,
 
-    ret = ff_hevc_parse_sps(&sps, &gb, &sps_id, 0, NULL, avctx);
-    av_freep(&sps_nal.rbsp_buffer);
-    if (ret < 0) {
-        av_log(avctx, AV_LOG_ERROR, "Error parsing the SPS\n");
-        return ret;
-    }
+        .profile_tier_level = sps->profile_tier_level,
 
-    /* generate the VPS */
-    vps.vps_max_layers     = 1;
-    vps.vps_max_sub_layers = sps.max_sub_layers;
-    memcpy(&vps.ptl, &sps.ptl, sizeof(vps.ptl));
-    vps.vps_sub_layer_ordering_info_present_flag = 1;
+        // Sub-layer info copied from SPS below.
+
+        .vps_max_layer_id             = 0,
+        .vps_num_layer_sets_minus1    = 0,
+        .layer_id_included_flag[0][0] = 1,
+
+        // Timing/HRD info copied from VUI below if present.
+    };
+
+    vps.vps_sub_layer_ordering_info_present_flag =
+        sps->sps_sub_layer_ordering_info_present_flag;
     for (i = 0; i < HEVC_MAX_SUB_LAYERS; i++) {
-        vps.vps_max_dec_pic_buffering[i] = sps.temporal_layer[i].max_dec_pic_buffering;
-        vps.vps_num_reorder_pics[i]      = sps.temporal_layer[i].num_reorder_pics;
-        vps.vps_max_latency_increase[i]  = sps.temporal_layer[i].max_latency_increase;
+        vps.vps_max_dec_pic_buffering_minus1[i] =
+            sps->sps_max_dec_pic_buffering_minus1[i];
+        vps.vps_max_num_reorder_pics[i] =
+            sps->sps_max_num_reorder_pics[i];
+        vps.vps_max_latency_increase_plus1[i] =
+            sps->sps_max_latency_increase_plus1[i];
     }
 
-    vps.vps_num_layer_sets                  = 1;
-    vps.vps_timing_info_present_flag        = sps.vui.vui_timing_info_present_flag;
-    vps.vps_num_units_in_tick               = sps.vui.vui_num_units_in_tick;
-    vps.vps_time_scale                      = sps.vui.vui_time_scale;
-    vps.vps_poc_proportional_to_timing_flag = sps.vui.vui_poc_proportional_to_timing_flag;
-    vps.vps_num_ticks_poc_diff_one          = sps.vui.vui_num_ticks_poc_diff_one_minus1 + 1;
+    if (sps->vui_parameters_present_flag &&
+        sps->vui.vui_timing_info_present_flag) {
+        const H265RawVUI *vui = &sps->vui;
 
-    /* generate the encoded RBSP form of the VPS */
-    ret = ff_hevc_encode_nal_vps(&vps, sps.vps_id, vps_rbsp_buf, sizeof(vps_rbsp_buf));
-    if (ret < 0) {
-        av_log(avctx, AV_LOG_ERROR, "Error writing the VPS\n");
-        return ret;
+        vps.vps_num_units_in_tick = vui->vui_num_units_in_tick;
+        vps.vps_time_scale        = vui->vui_time_scale;
+        vps.vps_poc_proportional_to_timing_flag =
+            vui->vui_poc_proportional_to_timing_flag;
+        vps.vps_num_ticks_poc_diff_one_minus1 =
+            vui->vui_num_ticks_poc_diff_one_minus1;
+
+        if (vui->vui_hrd_parameters_present_flag) {
+            vps.vps_num_hrd_parameters = 1;
+            vps.hrd_layer_set_idx[0]   = 0;
+            vps.cprms_present_flag[0]  = 1;
+            vps.hrd_parameters[0]      = vui->hrd_parameters;
+        }
+    } else {
+        vps.vps_timing_info_present_flag = 0;
     }
 
-    /* escape and add the startcode */
-    bytestream2_init(&gbc, vps_rbsp_buf, ret);
-    bytestream2_init_writer(&pbc, vps_buf, sizeof(vps_buf));
 
-    bytestream2_put_be32(&pbc, 1);                 // startcode
-    bytestream2_put_byte(&pbc, HEVC_NAL_VPS << 1); // NAL
-    bytestream2_put_byte(&pbc, 1);                 // header
-
-    while (bytestream2_get_bytes_left(&gbc)) {
-        uint32_t b = bytestream2_peek_be24(&gbc);
-        if (b <= 3) {
-            bytestream2_put_be24(&pbc, 3);
-            bytestream2_skip(&gbc, 2);
-        } else
-            bytestream2_put_byte(&pbc, bytestream2_get_byte(&gbc));
+    err = ff_cbs_insert_unit_content(&cbc, &ps, sps_pos, HEVC_NAL_VPS, &vps);
+    if (err < 0) {
+        av_log(avctx, AV_LOG_ERROR,
+               "Error inserting new VPS into parameter sets.\n");
+        goto fail;
     }
 
-    vps_size = bytestream2_tell_p(&pbc);
-    new_extradata = av_mallocz(vps_size + avctx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
-    if (!new_extradata)
-        return AVERROR(ENOMEM);
-    memcpy(new_extradata, vps_buf, vps_size);
-    memcpy(new_extradata + vps_size, avctx->extradata, avctx->extradata_size);
+    err = ff_cbs_write_fragment_data(&cbc, &ps);
+    if (err < 0) {
+        av_log(avctx, AV_LOG_ERROR, "Error writing new parameter sets.\n");
+        goto fail;
+    }
+
+    data_size = ps.data_size + AV_INPUT_BUFFER_PADDING_SIZE;
+    data      = av_mallocz(data_size);
+    if (!data) {
+        err = AVERROR(ENOMEM);
+        goto fail;
+    }
+    memcpy(data, ps.data, data_size);
 
     av_freep(&avctx->extradata);
-    avctx->extradata       = new_extradata;
-    avctx->extradata_size += vps_size;
+    avctx->extradata      = data;
+    avctx->extradata_size = data_size;
 
-    return 0;
+    err = 0;
+    data = NULL;
+
+fail:
+    ff_cbs_fragment_uninit(&cbc, &ps);
+    ff_cbs_close(&cbc);
+    av_freep(&data);
+    return err;
 }
 
 static av_cold int qsv_enc_init(AVCodecContext *avctx)
